@@ -138,10 +138,16 @@ ${feedback.liked.trim() ? `잘된 점은 ‘${feedback.liked.trim()}’이야.\n
 export function makeExamplePlan() {
   return { ...makeDefaultPlan(), gameName: '하천 쓰레기 수색대', living: '물고기, 개구리, 잠자리', trash: '페트병, 빈 캔, 과자 봉지', message: '쓰레기를 줍고 덜 만들면 생물이 쓰레기를 먹거나 몸에 걸릴 위험을 줄일 수 있어요.', specialIdea: FEATURE_EXAMPLES[0].text };
 }
-export function makePlanFile(plan, feedback) {
-  return { app: 'eco-game-prompt-studio', schemaVersion: SCHEMA_VERSION, savedAt: new Date().toISOString(), plan, feedback };
+export function finalPrompt(plan, promptDraft = null) {
+  return typeof promptDraft === 'string' ? promptDraft : makePrompt(plan);
+}
+function normalizePromptDraft(value) {
+  return typeof value === 'string' ? clean(value, 20_000) : null;
+}
+export function makePlanFile(plan, feedback, promptDraft = null) {
+  return { app: 'eco-game-prompt-studio', schemaVersion: SCHEMA_VERSION, savedAt: new Date().toISOString(), plan, feedback, promptDraft: normalizePromptDraft(promptDraft) };
 }
 export function parsePlanFile(raw) {
   if (!raw || typeof raw !== 'object' || raw.app !== 'eco-game-prompt-studio' || raw.schemaVersion !== SCHEMA_VERSION || !raw.plan || typeof raw.plan !== 'object' || Array.isArray(raw.plan)) throw new Error('이 앱에서 저장한 계획 파일을 선택해 주세요.');
-  return { plan: normalizePlan(raw.plan), feedback: normalizeFeedback(raw.feedback) };
+  return { plan: normalizePlan(raw.plan), feedback: normalizeFeedback(raw.feedback), promptDraft: normalizePromptDraft(raw.promptDraft) };
 }

@@ -1,9 +1,9 @@
-import { HABITATS, STYLES, FEATURE_EXAMPLES, REVISION_EXAMPLES, STORAGE_KEY, makeDefaultPlan, makeDefaultFeedback, normalizePlan, normalizeFeedback, habitatName, validatePlan, levelSchedule, makePrompt, makeRevision, makeExamplePlan, makePlanFile, parsePlanFile } from './core.mjs';
+import { HABITATS, STYLES, FEATURE_EXAMPLES, REVISION_EXAMPLES, STORAGE_KEY, makeDefaultPlan, makeDefaultFeedback, normalizePlan, normalizeFeedback, habitatName, validatePlan, levelSchedule, makePrompt, finalPrompt, makeRevision, makeExamplePlan, makePlanFile, parsePlanFile } from './core.mjs';
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const steps = ['생태계 계획', '게임 규칙', '그림과 아이디어', '프롬프트 완성', '체험 후 수정'];
-const state = { plan: makeDefaultPlan(), feedback: makeDefaultFeedback(), step: 0, errors: {} };
+const state = { plan: makeDefaultPlan(), feedback: makeDefaultFeedback(), promptDraft: null, step: 0, errors: {} };
 let saveTimer, toastTimer, dialogResolve;
 const arrow = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
 const copyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
@@ -16,7 +16,7 @@ function toast(message) {
 }
 function saveDraft() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...makePlanFile(state.plan, state.feedback), step: state.step }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...makePlanFile(state.plan, state.feedback, state.promptDraft), step: state.step }));
     $('saveState').textContent = '자동 저장됨';
     $('saveState').classList.add('saved');
   } catch {
@@ -36,6 +36,7 @@ function loadDraft() {
     const loaded = parsePlanFile(draft);
     state.plan = loaded.plan;
     state.feedback = loaded.feedback;
+    state.promptDraft = loaded.promptDraft;
     state.step = Object.keys(validatePlan(state.plan)).length ? 0 : Math.min(4, Math.max(0, Number(draft.step) || 0));
     $('saveState').textContent = '이어서 작성하는 중';
     $('saveState').classList.add('saved');
@@ -95,7 +96,7 @@ function renderStep(focus = false) {
       ${field('artNotes', '그림에 더 넣고 싶은 것', { optional: true, max: 300, placeholder: '예: 물결이 잔잔하게 움직이고 갈대가 흔들리면 좋겠어.' })}
       ${field('specialIdea', '나만의 특별한 기능', { optional: true, area: true, max: 600, className: 'idea-field', placeholder: '예: 쓰레기를 연속으로 주우면 보너스 점수를 받고 싶어.', after: `<div class="chip-row idea-examples"><span class="chip-lead">아이디어가 필요하면</span>${FEATURE_EXAMPLES.map((v, i) => `<button class="chip" data-feature="${i}">${v.title}</button>`).join('')}<button class="chip" data-feature="none">기본 게임으로</button></div>` })}`;
   } else if (state.step === 3) {
-    body = heading('<span class="complete-dot" aria-hidden="true">✓</span>내 프롬프트가 완성됐어요', '문장을 복사해서 캔바 AI의 코드 대화창에 붙여 넣어요.') + `<div class="output-toolbar"><button class="button primary" data-action="copy-prompt">${copyIcon}프롬프트 복사</button><button class="button secondary" data-action="download-prompt">텍스트 저장</button><a class="button soft" href="https://www.canva.com/" target="_blank" rel="noopener noreferrer">캔바 열기 ${arrow}</a></div><label class="field-label" for="promptOutput">캔바 AI에 입력할 문장</label><textarea id="promptOutput" class="prompt-output" readonly spellcheck="false" aria-label="완성된 게임 제작 프롬프트"></textarea><p class="output-note">게임을 직접 해본 뒤에는 <strong>체험 후 수정</strong> 단계에서 고칠 내용을 적어요.</p>`;
+    body = heading('<span class="complete-dot" aria-hidden="true">✓</span>내 프롬프트가 완성됐어요', '문장을 쭉 읽어 보고 내 생각에 맞게 직접 고쳐요. 다 고쳤으면 최종 문장을 복사해 캔바 AI의 코드에 붙여 넣어요.') + `<label class="field-label prompt-label" for="promptOutput">캔바 AI에 입력할 문장<span class="edit-badge">직접 수정 가능</span></label><textarea id="promptOutput" class="prompt-output" maxlength="20000" spellcheck="false" aria-label="완성된 게임 제작 프롬프트" aria-describedby="promptEditHint"></textarea><p id="promptEditHint" class="output-note prompt-edit-hint"></p><div class="output-toolbar final-toolbar"><button class="button primary" data-action="copy-prompt">${copyIcon}최종 문장 복사</button><button class="button secondary" data-action="download-prompt">텍스트 저장</button><a class="button soft" href="https://www.canva.com/" target="_blank" rel="noopener noreferrer">캔바 열기 ${arrow}</a><button class="text-button regenerate-button" data-action="regenerate-prompt">계획으로 다시 만들기</button></div><p class="output-note">게임을 직접 해본 뒤에는 <strong>체험 후 수정</strong> 단계에서 고칠 내용을 적어요.</p>`;
   } else {
     const f = state.feedback;
     body = heading('친구가 해본 뒤 고쳐요', '바꾸고 싶은 점을 구체적으로 적으면 수정 요청 문장이 완성돼요.') + `<div class="chip-row" style="margin:-3px 0 16px"><span class="chip-lead">예시</span>${REVISION_EXAMPLES.map((v, i) => `<button class="chip" data-revision="${i}">${v.title}</button>`).join('')}</div><div class="revision-grid"><div>
@@ -107,17 +108,29 @@ function renderStep(focus = false) {
   $('stepContent').innerHTML = `<div class="step-body fade-in ${state.step === 4 ? 'revision-body' : ''}">${body}</div>`;
   $('backButton').disabled = state.step === 0;
   $('nextButton').innerHTML = ['게임 규칙 정하기', '그림과 아이디어', '프롬프트 완성하기', '체험 후 수정하기', '완성 문장 다시 보기'][state.step] + arrow;
-  $('stepHint').textContent = ['내 생각을 먼저 적어요', '숫자를 바꾸면 난이도가 달라져요', '추가 기능은 없어도 괜찮아요', '생성된 게임은 직접 해봐요', '고친 뒤 같은 부분을 다시 확인해요'][state.step];
+  $('stepHint').textContent = ['내 생각을 먼저 적어요', '숫자를 바꾸면 난이도가 달라져요', '추가 기능은 없어도 괜찮아요', '읽기 → 직접 고치기 → 최종 복사', '고친 뒤 같은 부분을 다시 확인해요'][state.step];
   syncOutputs();
   if (focus) $('stepTitle').focus({ preventScroll: true });
 }
 function syncOutputs() {
-  if ($('promptOutput')) $('promptOutput').value = makePrompt(state.plan);
+  if ($('promptOutput')) {
+    $('promptOutput').value = finalPrompt(state.plan, state.promptDraft);
+    updatePromptControls();
+  }
   if ($('revisionOutput')) {
     const output = makeRevision(state.plan, state.feedback);
     $('revisionOutput').value = output;
     document.querySelectorAll('[data-action="copy-revision"],[data-action="download-revision"]').forEach(b => b.disabled = !output);
   }
+}
+function updatePromptControls() {
+  const output = finalPrompt(state.plan, state.promptDraft);
+  document.querySelectorAll('[data-action="copy-prompt"],[data-action="download-prompt"]').forEach(b => b.disabled = !output.trim());
+  const regenerate = document.querySelector('[data-action="regenerate-prompt"]');
+  if (regenerate) regenerate.disabled = state.promptDraft === null;
+  if ($('promptEditHint')) $('promptEditHint').textContent = state.promptDraft === null
+    ? '문장을 읽고, 고치고 싶은 부분을 위에서 직접 수정해 보세요.'
+    : '직접 고친 문장을 유지하고 있어요. 앞 단계의 계획을 다시 반영하려면 ‘계획으로 다시 만들기’를 눌러요.';
 }
 function clearFieldError(name) {
   delete state.errors[name];
@@ -188,7 +201,7 @@ function ask(title, description, accept = '계속하기') {
   return new Promise(resolve => dialogResolve = resolve);
 }
 function hasContent() {
-  return ['gameName', 'living', 'trash', 'message', 'artNotes', 'specialIdea'].some(k => state.plan[k].trim()) || Object.values(state.feedback).some(v => v.trim());
+  return state.promptDraft !== null || ['gameName', 'living', 'trash', 'message', 'artNotes', 'specialIdea'].some(k => state.plan[k].trim()) || Object.values(state.feedback).some(v => v.trim());
 }
 function closeMenu() { $('fileMenu').hidden = true; $('menuButton').setAttribute('aria-expanded', 'false'); }
 
@@ -198,7 +211,10 @@ $('backButton').addEventListener('click', () => goStep(state.step - 1));
 $('nextButton').addEventListener('click', () => goStep(state.step === 4 ? 3 : state.step + 1));
 $('stepContent').addEventListener('input', e => {
   const target = e.target;
-  if (target.dataset.field && Object.hasOwn(state.plan, target.dataset.field)) {
+  if (target.id === 'promptOutput') {
+    state.promptDraft = target.value === makePrompt(state.plan) ? null : target.value;
+    updatePromptControls(); scheduleSave();
+  } else if (target.dataset.field && Object.hasOwn(state.plan, target.dataset.field)) {
     state.plan[target.dataset.field] = target.value;
     clearFieldError(target.dataset.field);
     renderSummary(); syncOutputs(); scheduleSave();
@@ -254,15 +270,20 @@ document.addEventListener('click', async e => {
   } else if (b.dataset.action) {
     closeMenu();
     switch (b.dataset.action) {
-      case 'copy-prompt': await copyText(makePrompt(state.plan), 'promptOutput'); break;
-      case 'download-prompt': download(makePrompt(state.plan), '제작프롬프트'); break;
+      case 'copy-prompt': await copyText(finalPrompt(state.plan, state.promptDraft), 'promptOutput'); break;
+      case 'download-prompt': download(finalPrompt(state.plan, state.promptDraft), '제작프롬프트'); break;
+      case 'regenerate-prompt':
+        if (state.promptDraft !== null && await ask('계획으로 문장을 다시 만들까요?', '직접 고친 문장을 지우고, 앞 단계에서 정한 계획으로 문장을 다시 만듭니다. 필요하면 먼저 텍스트로 저장해 주세요.', '다시 만들기')) {
+          state.promptDraft = null;
+          syncOutputs(); saveDraft(); $('promptOutput').focus(); toast('지금 계획으로 문장을 다시 만들었어요.');
+        } break;
       case 'copy-revision': await copyText(makeRevision(state.plan, state.feedback), 'revisionOutput'); break;
       case 'download-revision': download(makeRevision(state.plan, state.feedback), '수정프롬프트'); break;
-      case 'export-plan': download(JSON.stringify(makePlanFile(state.plan, state.feedback), null, 2), '게임계획', 'application/json;charset=utf-8', 'json'); toast('계획 파일을 저장했어요. 다음에 불러와 이어 쓸 수 있어요.'); break;
+      case 'export-plan': download(JSON.stringify(makePlanFile(state.plan, state.feedback, state.promptDraft), null, 2), '게임계획', 'application/json;charset=utf-8', 'json'); toast('계획 파일을 저장했어요. 다음에 불러와 이어 쓸 수 있어요.'); break;
       case 'import-plan': $('planFileInput').click(); break;
       case 'reset':
         if (await ask('새 게임을 계획할까요?', '지금 작성한 내용을 지우고 처음부터 시작합니다. 필요하면 먼저 계획 파일로 저장해 주세요.', '새로 만들기')) {
-          state.plan = makeDefaultPlan(); state.feedback = makeDefaultFeedback(); state.step = 0; state.errors = {};
+          state.plan = makeDefaultPlan(); state.feedback = makeDefaultFeedback(); state.promptDraft = null; state.step = 0; state.errors = {};
           renderStep(true); saveDraft(); toast('새로운 게임 계획을 시작해요.');
         } break;
     }
@@ -271,7 +292,7 @@ document.addEventListener('click', async e => {
 });
 $('exampleButton').addEventListener('click', async () => {
   if (hasContent() && !await ask('예시 계획을 불러올까요?', '지금 적은 내용을 ‘하천 쓰레기 수색대’ 예시로 바꿉니다. 필요하면 먼저 계획 파일을 저장해 주세요.', '예시로 채우기')) return;
-  state.plan = makeExamplePlan(); state.feedback = makeDefaultFeedback(); state.step = 0; state.errors = {};
+  state.plan = makeExamplePlan(); state.feedback = makeDefaultFeedback(); state.promptDraft = null; state.step = 0; state.errors = {};
   renderStep(true); saveDraft(); toast('예시를 채웠어요. 내 아이디어로 바꿔 보세요.');
 });
 $('menuButton').addEventListener('click', () => {
@@ -289,7 +310,7 @@ $('planFileInput').addEventListener('change', async () => {
     if (file.size > 100_000) throw new Error('계획 파일이 너무 큽니다. 이 앱에서 저장한 파일을 선택해 주세요.');
     const loaded = parsePlanFile(JSON.parse(await file.text()));
     if (hasContent() && !await ask('저장한 계획을 불러올까요?', '현재 작성 중인 내용을 선택한 파일의 계획으로 바꿉니다.', '불러오기')) return;
-    state.plan = loaded.plan; state.feedback = loaded.feedback; state.step = 0; state.errors = {};
+    state.plan = loaded.plan; state.feedback = loaded.feedback; state.promptDraft = loaded.promptDraft; state.step = 0; state.errors = {};
     renderStep(true); saveDraft(); toast('저장한 계획을 불러왔어요.');
   } catch (error) { toast(error instanceof SyntaxError ? '계획 파일을 읽을 수 없어요. 이 앱에서 저장한 JSON 파일을 선택해 주세요.' : error.message); }
   finally { $('planFileInput').value = ''; }
