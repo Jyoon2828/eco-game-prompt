@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#255d50">
+  <meta name="description" content="생태계를 지키는 나만의 게임을 계획하고, 캔바 AI에 입력할 프롬프트를 만들어 보세요.">
+  <title>초록 게임 공작소 · 생태계 게임 프롬프트 만들기</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23255d50'/%3E%3Cpath d='M12 25C9 12 20 8 30 10c0 12-5 20-15 17m0 0 10-11' stroke='%23e4f0c9' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#editor">본문으로 이동</a>
+  <div class="app-shell">
+    <header class="app-header">
+      <button class="brand" id="homeButton" aria-label="계획 화면으로 이동">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M10 27C7 13 20 8 31 10c0 13-6 21-17 19m0 0 12-15"/></svg></span>
+        <span><strong>초록 게임 공작소</strong><small>생태계 보전 게임 프롬프트 만들기</small></span>
+      </button>
+      <div class="header-tools">
+        <span class="save-state" id="saveState" role="status">나의 계획을 시작해요</span>
+        <button class="text-button" id="exampleButton">예시로 채우기</button>
+        <button class="icon-button" id="menuButton" aria-label="계획 파일 메뉴" aria-expanded="false" aria-controls="fileMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+        <div class="file-menu" id="fileMenu" hidden>
+          <button data-action="export-plan">계획 파일 저장</button>
+          <button data-action="import-plan">저장한 계획 불러오기</button>
+          <button data-action="reset">처음부터 새로 만들기</button>
+        </div>
+      </div>
+    </header>
+    <nav class="step-nav" id="stepNav" aria-label="프롬프트 제작 단계"></nav>
+    <main class="workspace">
+      <section class="editor" id="editor" aria-labelledby="stepTitle">
+        <div id="stepContent"></div>
+        <footer class="step-footer">
+          <button class="button secondary" id="backButton">이전</button>
+          <p id="stepHint"></p>
+          <button class="button primary" id="nextButton">다음 단계</button>
+        </footer>
+      </section>
+      <aside class="plan-preview" aria-label="내 게임 계획">
+        <div class="preview-image" role="img" aria-label="물고기와 개구리가 사는 하천 생태계"></div>
+        <div class="preview-content">
+          <span class="small-label">내가 만드는 게임</span>
+          <h2 id="summaryName">나만의 초록 게임</h2>
+          <p class="summary-place" id="summaryPlace">하천을 지키는 게임</p>
+          <dl class="summary-list" id="summaryList"></dl>
+          <div class="summary-message"><span>친구에게 전할 말</span><p id="summaryMessage">어떤 보전 방법을 알려 주고 싶나요?</p></div>
+        </div>
+      </aside>
+    </main>
+    <p class="app-caption">내가 정한 아이디어를 요청 문장으로 만들어요. 완성한 문장은 캔바 AI의 코드에 붙여 넣어요.</p>
+  </div>
+  <input id="planFileInput" type="file" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="confirmDialog">
+    <h2 id="dialogTitle"></h2>
+    <p id="dialogDescription"></p>
+    <div class="dialog-actions"><button class="button secondary" id="cancelDialog">취소</button><button class="button primary" id="acceptDialog">계속하기</button></div>
+  </dialog>
+  <noscript><p class="no-script">이 도구를 사용하려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
+</body>
+</html>
